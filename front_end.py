@@ -33,7 +33,11 @@ def login(username, password):
 
     cursor.close()
     conn.close()
-if __name__ == "__main__":
+
+def welcome_page():
+    print("Welcome to stock tracker!\nPlease Log in\n*NOTE: To register, please contact head quater to be provisioned*\n")
     username = input("Enter username: ")
     password = input("Enter password: ")
     login(username, password)
+if __name__ == "__main__":
+    welcome_page()
