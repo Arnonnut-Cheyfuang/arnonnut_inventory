@@ -10,14 +10,5 @@ conn = mysql.connector.connect(
 )
 
 cursor = conn.cursor()
-cursor.execute("SELECT * FROM users LIMIT 0")
-
-# Fetch the result (even if it's empty) to avoid "Unread result found"
-cursor.fetchall()
-
-# Now you can safely read column names
-column_names = [i[0] for i in cursor.description]
-print(column_names)
-
-cursor.close()
-conn.close()
+cursor.execute("SELECT * FROM items")
+print(cursor.fetchall())
