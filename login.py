@@ -4,8 +4,8 @@ import hashlib
 def login(username, password):
     conn = mysql.connector.connect(
     host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
-    user='admin_user',
-    password='Admin_password456!',
+    user='readonly_user',
+    password='Readonly_pass789!',
     database='stockdb',
     ssl_ca='server_cert.pem',
     ssl_disabled=False
