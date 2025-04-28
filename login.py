@@ -2,8 +2,6 @@ import mysql.connector
 import hashlib
 
 def login(username, password):
-    # Connect to the database
-    
     conn = mysql.connector.connect(
     host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
     user='admin_user',
@@ -20,7 +18,7 @@ def login(username, password):
     user = cursor.fetchone()
 
     if user:
-        password+= user["salt"]
+        password+= user["pepper"]
         hash_obj = hashlib.sha256(password.encode('utf-8'))
         password = hash_obj.hexdigest()
         if password == user["password"]:
@@ -36,7 +34,7 @@ def login(username, password):
     cursor.close()
     conn.close()
 
-    if __name__ == "__main__":
-        username = input("Enter username: ")
-        password = input("Enter password: ")
-        login(username, password)
+if __name__ == "__main__":
+    username = input("Enter username: ")
+    password = input("Enter password: ")
+    login(username, password)
