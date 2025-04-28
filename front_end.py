@@ -1,6 +1,7 @@
 import mysql.connector
 import hashlib
-
+user = ""
+location = ""
 def login(username, password):
     conn = mysql.connector.connect(
     host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
@@ -22,7 +23,8 @@ def login(username, password):
         hash_obj = hashlib.sha256(password.encode('utf-8'))
         password = hash_obj.hexdigest()
         if password == user["password"]:
-            print("Login successful!")
+            user = user["full_name"]
+            location = user["current_location_id"]
             return True
         else:
             print("Incorrect password.")
@@ -38,6 +40,20 @@ def welcome_page():
     print("Welcome to stock tracker!\nPlease Log in\n*NOTE: To register, please contact head quater to be provisioned*\n")
     username = input("Enter username: ")
     password = input("Enter password: ")
-    login(username, password)
+    while True:
+        if(login(username, password)):
+            print("Login successful!")
+            break
+        else:
+            print("Login failed. Please try again.")
+            username = input("Enter username: ")
+            password = input("Enter password: ")
+def scan_item():
+    rfid = input("Enter RFID code: ")
+    
+def main_menu():
+    print(f"Welcome to the main menu! {user}")
+    print("How can I help you today?")
+    option = input("1.Scan item\n2.Check stcok level\n3.View item details\n")
 if __name__ == "__main__":
     welcome_page()
