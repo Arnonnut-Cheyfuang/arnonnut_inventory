@@ -133,21 +133,67 @@ def check_stock_level():
         print(f"Error: {err}")
 
 def view_item_details():
-    global conn
-    cursor.execute("SELECT * FROM items")
+    global conn,cursor
+    cursor.execute("SELECT i.item_id, i.item_name, i.description, i.supplier_id, s.supplier_name, s.contact_info FROM items i INNER JOIN  suppliers s on i.supplier_id = s.supplier_id")
     lists = cursor.fetchall()
     if not lists:
         print("No items found")
         return
-    for index, row in enumerate(lists, start=1):
-        print(f"{index}. {row['item_name']}")
-
+    while True:
+        for index, row in enumerate(lists, start=1):
+            print(f"{index}. {row['item_name']}")
+        try:
+            option = input("Please select an item to view details (1-{}): ".format(len(lists)))
+            option = int(option)-1
+            if option < 0 or option > len(lists):
+                raise ValueError("Please enter a number in the item list")
+        except Exception as err:
+            print(f"Please supply a valid input\nError: {err}")
+            continue
+        print("="*20)
+        print(f"Showing item {lists[option]['item_name']}")
+        print("-"*20)
+        selected = lists[option]
+        for key, value in selected.items():
+            print(f"{key}: {value}")
+        print("="*20 + "\n" + "="*20)
+        print("1. View another item\n2. Back to main menu")
+        quit = False
+        while True:
+            ops = input("Please select an option: ")
+            try:
+                ops = int(ops)
+                if ops == 1:
+                    print("="*20)
+                    break
+                elif ops == 2:
+                    quit = True
+                    print("="*20)
+                    break
+                else:
+                    raise ValueError("Please enter a number")
+            except Exception as err:
+                print(f"Please supply a valid input\nError: {err}")
+        if quit:
+            break
+def locaete():
+    global conn, cursor
+    try:
+        cursor.execute("SELECT i.item_id, i.item_name, l.location_name, l.address from items i INNER JOIN stock_levels s ON i.item_id=s.item_id INNER JOIN locations l on l.location_id = s.location_id;")
+        results = cursor.fetchall()
+        if not results:
+            print("No stock data found.")
+            return
+    except Exception as err:
+        print(f"Error: {err}")
 def main_menu():
     global user_name
     print(f"Welcome to the main menu! {user_name}")
     print("How can I help you today?")
-    option = input("1. Scan item\n2. Check stock level\n3. View item details\n")
+    while True:
+            option = input("1. Scan item\n2. Check stock level\n3. View item details\n")
+            option = int(option)
 
 if __name__ == "__main__":
     welcome_page()
-    scan_item()
+    view_item_details()
