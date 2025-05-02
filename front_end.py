@@ -274,7 +274,7 @@ def main_menu():
     print(f"Welcome! {user_name}")
     print("How can I help you today?\n")
     while True:
-            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Quit\n")
+            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Quit\nYour selection: ")
             print("="*20)
             try:
                 option = int(option)
@@ -296,11 +296,11 @@ def main_menu():
                     export()
                 case 6:
                     print("Exiting....\n")
+                    conn.close()
+                    cursor.close()
                     print("="*20)
                     print(f"Goodbye, see you again soon! {user_name}\n")
                     print("="*20)
-                    conn.close()
-                    cursor.close()
                     sys.exit()
             print("Could I offer you any more help?\n")
 if __name__ == "__main__":
