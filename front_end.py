@@ -136,8 +136,11 @@ def view_item_details():
     global conn
     cursor.execute("SELECT * FROM items")
     lists = cursor.fetchall()
-    for row in lists:
-        print(f"")
+    if not lists:
+        print("No items found")
+        return
+    for index, row in enumerate(lists, start=1):
+        print(f"{index}. {row['item_name']}")
 
 def main_menu():
     global user_name
