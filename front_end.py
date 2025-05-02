@@ -55,20 +55,24 @@ def welcome_page():
     print("="*20)
     print("Welcome to stock tracker!\nPlease Log in\n*NOTE: To register, please contact head quater to be provisioned*\n")
     print("="*20)
-    username = input("Enter username: ")
-    password = input("Enter password: ")
 
     while True:
         if attempt >= 5:
             locked+=1
+            wait_time = 300 * locked
             print("*"*20)
-            print(f"Too many login attempt!\nSystem is locked for {5*locked} minutes\n")
-            print("*"*20)
-            time.sleep(300*locked)
-            print("="*20)
+            print(f"Too many log in attempts! System is locked for {wait_time // 60} minutes. Countdown:")
+            for remaining in range(wait_time, 0, -1):
+                mins, secs = divmod(remaining, 60)
+                timer = f"{mins:02d}:{secs:02d}"
+                print(f"\rUnlocks in: {timer}", end="")
+                time.sleep(1)
+            print("\n"+ "="*20)
             print("System unlocked")
             print("="*20)
             attempt = 0
+        username = input("Enter username: ")
+        password = input("Enter password: ")
         if login(username, password):
             print(f"Login successful! Welcome {user_name}!")
             conn = mysql.connector.connect(
@@ -83,8 +87,6 @@ def welcome_page():
             break
         else:
             print("Login failed. Please try again.")
-            username = input("Enter username: ")
-            password = input("Enter password: ")
 
 def scan_item():
     global cursor, location
