@@ -1,27 +1,33 @@
 import mysql.connector
 import hashlib
+import sys
+import pandas as pd
+import time
 
 user_name = ""
 location = ""
 conn = None
 cursor = None
+attempt = 0
+locked = 0
 
 def login(username, password):
-    global conn, cursor, user_name, location
+    global conn, cursor, user_name, location, attempt, locked
+    try:
+        con = mysql.connector.connect(
+            host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
+            user='readonly_user',
+            password='Readonly_pass789!',
+            database='stockdb',
+            ssl_ca='server_cert.pem',
+            ssl_disabled=False
+        )
+        curso = con.cursor(dictionary=True)
 
-    conn = mysql.connector.connect(
-        host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
-        user='readonly_user',
-        password='Readonly_pass789!',
-        database='stockdb',
-        ssl_ca='server_cert.pem',
-        ssl_disabled=False
-    )
-    cursor = conn.cursor(dictionary=True)
-
-    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-    user = cursor.fetchone()
-
+        curso.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = curso.fetchone()
+    except Exception as err:
+        print(f"Connection Error!\n{err}\n")
     if user:
         password += user["pepper"]
         hash_obj = hashlib.sha256(password.encode('utf-8'))
@@ -30,21 +36,39 @@ def login(username, password):
         if password == user["password"]:
             user_name = user["full_name"]
             location = user["current_location_id"]
+            con.close()
+            curso.close()
             return True
         else:
             print("Incorrect password.")
+            attempt+=1
+            time.sleep(1.5)
             return False
     else:
         print("User not found.")
+        attempt+=1
+        time.sleep(1.5)
         return False
 
 def welcome_page():
-    global conn, cursor
+    global conn, cursor, attempt, locked
+    print("="*20)
     print("Welcome to stock tracker!\nPlease Log in\n*NOTE: To register, please contact head quater to be provisioned*\n")
+    print("="*20)
     username = input("Enter username: ")
     password = input("Enter password: ")
 
     while True:
+        if attempt >= 5:
+            locked+=1
+            print("*"*20)
+            print(f"Too many login attempt!\nSystem is locked for {5*locked} minutes\n")
+            print("*"*20)
+            time.sleep(300*locked)
+            print("="*20)
+            print("System unlocked")
+            print("="*20)
+            attempt = 0
         if login(username, password):
             print(f"Login successful! Welcome {user_name}!")
             conn = mysql.connector.connect(
@@ -115,27 +139,33 @@ def check_stock_level():
         SELECT 
             i.item_id,
             i.item_name,
-            s.location_id AS current_location_id,
-            s.stock_level
+            l.location_name AS "Current Location",
+            s.quantity
         FROM items i
-        JOIN stock s ON i.item_id = s.item_id
+        JOIN stock_levels s ON i.item_id = s.item_id
+        INNER JOIN locations l ON s.location_id=l.location_id
         """)
         results = cursor.fetchall()
         if not results:
+            print("="*20)
             print("No stock data found.")
+            print("="*20)
             return
 
         print(f"{'Item ID':<10} {'Item Name':<30} {'Location':<15} {'Level':<10}")
         print("-" * 70)
         for row in results:
-            print(f"{row['item_id']:<10} {row['item_name']:<30} {row['current_location_id']:<15} {row['stock_level']:<10}")
+            print(f"{row['item_id']:<10} {row['item_name']:<30} {row['Current Location']:<15} {row['quantity']:<10}")
     except Exception as err:
-        print(f"Error: {err}")
+        print(f"Error: {err}\n")
 
 def view_item_details():
     global conn,cursor
-    cursor.execute("SELECT i.item_id, i.item_name, i.description, i.supplier_id, s.supplier_name, s.contact_info FROM items i INNER JOIN  suppliers s on i.supplier_id = s.supplier_id")
-    lists = cursor.fetchall()
+    try:
+        cursor.execute("SELECT i.item_id, i.item_name, i.description, i.supplier_id, s.supplier_name, s.contact_info FROM items i INNER JOIN  suppliers s on i.supplier_id = s.supplier_id")
+        lists = cursor.fetchall()
+    except Exception as err:
+        print(f"Connection Error!\n{err}\n")
     if not lists:
         print("No items found")
         return
@@ -143,12 +173,12 @@ def view_item_details():
         for index, row in enumerate(lists, start=1):
             print(f"{index}. {row['item_name']}")
         try:
-            option = input("Please select an item to view details (1-{}): ".format(len(lists)))
+            option = input("Please select an item to view details (1-{}): \n".format(len(lists)))
             option = int(option)-1
             if option < 0 or option > len(lists):
                 raise ValueError("Please enter a number in the item list")
         except Exception as err:
-            print(f"Please supply a valid input\nError: {err}")
+            print(f"Please supply a valid input\nError: {err}\n")
             continue
         print("="*20)
         print(f"Showing item {lists[option]['item_name']}")
@@ -157,10 +187,10 @@ def view_item_details():
         for key, value in selected.items():
             print(f"{key}: {value}")
         print("="*20 + "\n" + "="*20)
-        print("1. View another item\n2. Back to main menu")
+        print("1. View another item\n2. Back to main menu\n")
         quit = False
         while True:
-            ops = input("Please select an option: ")
+            ops = input("Please select an option: \n")
             try:
                 ops = int(ops)
                 if ops == 1:
@@ -176,24 +206,103 @@ def view_item_details():
                 print(f"Please supply a valid input\nError: {err}")
         if quit:
             break
-def locaete():
+def locate():
     global conn, cursor
     try:
         cursor.execute("SELECT i.item_id, i.item_name, l.location_name, l.address from items i INNER JOIN stock_levels s ON i.item_id=s.item_id INNER JOIN locations l on l.location_id = s.location_id;")
-        results = cursor.fetchall()
-        if not results:
-            print("No stock data found.")
-            return
+        lists = cursor.fetchall()
     except Exception as err:
-        print(f"Error: {err}")
+        print(f"Connection Error!\n{err}\n")
+    if not lists:
+        print("No stock data found.\n")
+        return
+    while True:
+        for index, row in enumerate(lists, start=1):
+            print(f"{index}. {row['item_name']}")
+        try:
+            option = input("Please select an item to locate (1-{}):\n ".format(len(lists)))
+            option = int(option)-1
+            if option < 0 or option > len(lists):
+                raise ValueError("Please enter a number in the item list\n")
+        except Exception as err:
+            print(f"Please supply a valid input\nError: {err}")
+            continue
+        print("="*20)
+        print(f"Showing item {lists[option]['item_name']}")
+        print("-"*20)
+        selected = lists[option]
+        for key, value in selected.items():
+            print(f"{key}: {value}")
+        print("="*20 + "\n" + "="*20)
+        print("1. View another item\n2. Back to main menu\n")
+        quit = False
+        while True:
+            ops = input("Please select an option: \n")
+            try:
+                ops = int(ops)
+                if ops == 1:
+                    print("="*20)
+                    break
+                elif ops == 2:
+                    quit = True
+                    print("="*20)
+                    break
+                else:
+                    raise ValueError("Please enter a number\n")
+            except Exception as err:
+                print(f"Please supply a valid input\nError: {err}\n")
+        if quit:
+            break
+        
+def export():
+    global conn
+    try:
+        query = """SELECT i.item_id, i.item_name, i.description, l.location_name, sl.quantity, s.supplier_name, s.contact_info 
+                FROM items i INNER JOIN  suppliers s on i.supplier_id = s.supplier_id INNER JOIN stock_levels sl ON i.item_id=sl.item_id 
+                INNER JOIN locations l ON  l.location_id = sl.location_id
+                """
+        df = pd.read_sql(query, conn)
+        df.to_excel("inventory_export.xlsx", index=False)
+        print("="*20)
+        print("Exported successfully to inventory_export.xlsx")
+        print("="*20)
+    except Exception as err:
+        print(f"Connection Error!\n{err}\n")
+    
 def main_menu():
     global user_name
-    print(f"Welcome to the main menu! {user_name}")
-    print("How can I help you today?")
+    print(f"Welcome! {user_name}")
+    print("How can I help you today?\n")
     while True:
-            option = input("1. Scan item\n2. Check stock level\n3. View item details\n")
-            option = int(option)
-
+            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Quit\n")
+            print("="*20)
+            try:
+                option = int(option)
+                if option not in range(1,7):
+                    raise ValueError("Selected value is not in the option\n")
+            except Exception as err:
+                print(f"Please input a valid choice!\nError: {err}\n")
+                print("="*20)
+            match option:
+                case 1:
+                    scan_item()
+                case 2:
+                    check_stock_level()
+                case 3:
+                    view_item_details()
+                case 4:
+                    locate()
+                case 5:
+                    export()
+                case 6:
+                    print("Exiting....\n")
+                    print("="*20)
+                    print(f"Goodbye, see you again soon! {user_name}\n")
+                    print("="*20)
+                    conn.close()
+                    cursor.close()
+                    sys.exit()
+            print("Could I offer you any more help?\n")
 if __name__ == "__main__":
     welcome_page()
-    view_item_details()
+    main_menu()
