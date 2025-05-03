@@ -34,7 +34,6 @@ def log_action(username, action_type, description):
     except Exception as log_err:
         print(f"Failed to log action: {log_err}")
 
-
 def login(username, password):
     global conn, cursor, user_name, location, attempt, locked
     try:
@@ -57,7 +56,7 @@ def login(username, password):
         hash_obj = hashlib.sha256(password.encode('utf-8'))
         password = hash_obj.hexdigest()
 
-        if password == user["password"]:
+        if (password == user["password"]) and (user["privilege"] == "read_write"):
             user_name = user["full_name"]
             location = user["current_location_id"]
             log_action(username, "LOGIN", f"Login successful for user {username}")
@@ -65,7 +64,7 @@ def login(username, password):
             curso.close()
             return True
         else:
-            print("Incorrect password.")
+            print("Invalid Login.\nMake sure you are using the correct username and password.\nOr your account is not provisioned to access this system.\n")
             log_action(username, "LOGIN_FAIL", f"Incorrect password attempt for user {username}")
             attempt+=1
             time.sleep(1.5)
@@ -104,8 +103,8 @@ def welcome_page():
             print(f"Login successful! Welcome {user_name}!")
             conn = mysql.connector.connect(
                 host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
-                user='inventory_mover',
-                password='Strong_Password1234!',
+                user='app_user',
+                password='App_password123!',
                 database='stockdb',
                 ssl_ca='server_cert.pem',
                 ssl_disabled=False
@@ -301,13 +300,170 @@ def export():
     except Exception as err:
         print(f"Connection Error!\n{err}\n")
         log_action(user_name, "ERROR", f"Export failed: {err}")
-    
+
+def manage_inventory():
+    global cursor, conn, user_name
+    while True:
+        print("\n" + "="*20)
+        print("Inventory & Supplier Management")
+        print("="*20)
+        print("1. Add Item\n2. Edit Item\n3. Delete Item")
+        print("4. Add Supplier\n5. Edit Supplier\n6. Delete Supplier")
+        print("7. Back to Main Menu")
+
+        try:
+            choice = int(input("Choose an option (1–7): "))
+            if choice not in range(1, 8):
+                raise ValueError("Option out of range.")
+        except Exception as err:
+            print(f"Invalid input! Please enter a number between 1 and 7.\nError: {err}\n")
+            continue
+
+        match choice:
+            case 1:
+                try:
+                    cursor.execute("SELECT supplier_id, supplier_name FROM suppliers")
+                    suppliers = cursor.fetchall()
+                    if not suppliers:
+                        print("No suppliers found. Please add a supplier first.")
+                        continue
+                    print("\nAvailable Suppliers:")
+                    for s in suppliers:
+                        print(f"ID: {s['supplier_id']} | Name: {s['supplier_name']}")
+                    item_name = input("Item name: ")
+                    description = input("Description: ")
+                    supplier_id = input("Enter Supplier ID from list above: ")
+                    cursor.execute("INSERT INTO items (item_name, description, supplier_id) VALUES (%s, %s, %s)", 
+                                   (item_name, description, supplier_id))
+                    conn.commit()
+                    print("Item added successfully.")
+                    log_action(user_name, "INSERT", f"Added item '{item_name}' with supplier ID {supplier_id}")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to add item: {err}")
+
+            case 2:
+                try:
+                    cursor.execute("SELECT item_id, item_name FROM items")
+                    items = cursor.fetchall()
+                    if not items:
+                        print("No items found.")
+                        continue
+                    print("\nAvailable Items:")
+                    for i in items:
+                        print(f"ID: {i['item_id']} | Name: {i['item_name']}")
+                    item_id = input("Enter Item ID to update: ")
+                    new_name = input("New Item Name: ")
+                    new_desc = input("New Description: ")
+                    cursor.execute("UPDATE items SET item_name = %s, description = %s WHERE item_id = %s",
+                                   (new_name, new_desc, item_id))
+                    conn.commit()
+                    print("Item updated successfully.")
+                    log_action(user_name, "UPDATE", f"Updated item ID {item_id} to '{new_name}'")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to update item ID {item_id}: {err}")
+
+            case 3:
+                try:
+                    cursor.execute("SELECT item_id, item_name FROM items")
+                    items = cursor.fetchall()
+                    if not items:
+                        print("No items found.")
+                        continue
+                    print("\nAvailable Items:")
+                    for i in items:
+                        print(f"ID: {i['item_id']} | Name: {i['item_name']}")
+                    item_id = input("Enter Item ID to delete: ")
+                    cursor.execute("DELETE FROM items WHERE item_id = %s", (item_id,))
+                    conn.commit()
+                    print("Item deleted successfully.")
+                    log_action(user_name, "DELETE", f"Deleted item ID {item_id}")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to delete item ID {item_id}: {err}")
+
+            case 4:
+                try:
+                    name = input("Supplier name: ")
+                    contact = input("Contact info: ")
+                    cursor.execute("INSERT INTO suppliers (supplier_name, contact_info) VALUES (%s, %s)", 
+                                   (name, contact))
+                    conn.commit()
+                    print("Supplier added successfully.")
+                    log_action(user_name, "INSERT", f"Added supplier '{name}'")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to add supplier: {err}")
+
+            case 5:
+                try:
+                    cursor.execute("SELECT supplier_id, supplier_name FROM suppliers")
+                    suppliers = cursor.fetchall()
+                    if not suppliers:
+                        print("No suppliers found.")
+                        continue
+                    print("\nAvailable Suppliers:")
+                    for s in suppliers:
+                        print(f"ID: {s['supplier_id']} | Name: {s['supplier_name']}")
+                    sid = input("Enter Supplier ID to update: ")
+                    new_name = input("New Supplier Name: ")
+                    new_contact = input("New Contact Info: ")
+                    cursor.execute("UPDATE suppliers SET supplier_name = %s, contact_info = %s WHERE supplier_id = %s",
+                                   (new_name, new_contact, sid))
+                    conn.commit()
+                    print("Supplier updated successfully.")
+                    log_action(user_name, "UPDATE", f"Updated supplier ID {sid} to '{new_name}'")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to update supplier ID {sid}: {err}")
+
+            case 6:
+                try:
+                    cursor.execute("SELECT supplier_id, supplier_name FROM suppliers")
+                    suppliers = cursor.fetchall()
+                    if not suppliers:
+                        print("No suppliers found.")
+                        continue
+                    print("\nAvailable Suppliers:")
+                    for s in suppliers:
+                        print(f"ID: {s['supplier_id']} | Name: {s['supplier_name']}")
+                    sid = input("Enter Supplier ID to delete: ")
+                    cursor.execute("DELETE FROM suppliers WHERE supplier_id = %s", (sid,))
+                    conn.commit()
+                    print("Supplier deleted successfully.")
+                    log_action(user_name, "DELETE", f"Deleted supplier ID {sid}")
+                except Exception as err:
+                    print(f"Error: {err}")
+                    log_action(user_name, "ERROR", f"Failed to delete supplier ID {sid}: {err}")
+
+            case 7:
+                print("Returning to main menu...\n")
+                break
+
+
+def view_logs():
+    global conn, cursor
+    try:
+        cursor.execute("SELECT * FROM logs")
+        logs = cursor.fetchall()
+        if not logs:
+            print("No logs found.")
+            return
+        print(f"{'Log ID':<10} {'User':<30} {'Action Type':<30} {'Description':<70} {'Timestamp':<50}")
+        print("-" * 200)
+        for log in logs:
+            print(f"{log['log_id']:<10} {log['username']:<30} {log['action_type']:<30} {log['description']:<70} {str(log['timestamp']):<20}")
+        print("-" * 200)
+    except Exception as err:
+        print(f"Error: {err}\n")
+
 def main_menu():
     global user_name
     print(f"Welcome! {user_name}")
     print("How can I help you today?\n")
     while True:
-            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Quit\nYour selection: ")
+            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Manage Inventory and Suppliers\n7. View Logs\n8. Quit\nYour selection: ")
             print("="*20)
             try:
                 option = int(option)
@@ -328,13 +484,16 @@ def main_menu():
                 case 5:
                     export()
                 case 6:
+                    manage_inventory()
+                case 7:
+                    view_logs()
+                case 8:
                     print("Exiting....\n")
                     conn.close()
                     cursor.close()
                     print("="*20)
                     print(f"Goodbye, see you again soon! {user_name}\n")
                     print("="*20)
-                    log_action(user_name, "Logged out", f"User {user_name} logged out")
                     sys.exit()
             print("Could I offer you any more help?\n")
 if __name__ == "__main__":
