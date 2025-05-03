@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 import time
 import getpass as g
+import secrets
 
 user_name = ""
 location = ""
@@ -458,12 +459,43 @@ def view_logs():
     except Exception as err:
         print(f"Error: {err}\n")
 
+def register():
+    global conn, cursor
+    try:
+        username = input("Choose a username: ")
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        if cursor.fetchone():
+            print("Username already exists. Please try another.")
+            return
+
+        password = g.getpass("Choose a password: ")
+        full_name = input("Enter your full name: ")
+        location_id = input("Enter your default location ID: ")
+
+        pepper = secrets.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+        hashed_pw = hashlib.sha256((password + pepper).encode('utf-8')).hexdigest()
+
+        cursor.execute("""
+            INSERT INTO users (username, password, pepper, full_name, current_location_id, privilege)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (username, hashed_pw, pepper, full_name, location_id, 'read_only'))
+
+        conn.commit()
+        print("Registration successful. Await provisioning to gain access.")
+        log_action(username, "REGISTER", f"Registered user {username} with read_only privilege.")
+        cursor.close()
+        conn.close()
+
+    except Exception as err:
+        print(f"Registration failed: {err}")
+        log_action("SYSTEM", "REGISTER_FAIL", f"Failed to register user {username}: {err}")
+
 def main_menu():
     global user_name
     print(f"Welcome! {user_name}")
     print("How can I help you today?\n")
     while True:
-            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Manage Inventory and Suppliers\n7. View Logs\n8. Quit\nYour selection: ")
+            option = input("1. Scan item\n2. Check stock level\n3. View item details\n4. Locate an item\n5. Export Stock Data\n6. Manage Inventory and Suppliers\n7. View Logs\n8. Register a staff\n9. Quit\nYour selection: ")
             print("="*20)
             try:
                 option = int(option)
@@ -488,6 +520,8 @@ def main_menu():
                 case 7:
                     view_logs()
                 case 8:
+                    register()
+                case 9:
                     print("Exiting....\n")
                     conn.close()
                     cursor.close()
