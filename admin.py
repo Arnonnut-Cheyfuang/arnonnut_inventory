@@ -530,6 +530,7 @@ def main_menu():
                     print("="*20)
                     sys.exit()
             print("Could I offer you any more help?\n")
+            print("="*20)
 if __name__ == "__main__":
     welcome_page()
     main_menu()
