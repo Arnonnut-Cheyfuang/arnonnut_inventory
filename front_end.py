@@ -5,6 +5,7 @@ import pandas as pd
 import time
 import getpass as g
 
+# Global variables for session state
 user_name = ""
 location = ""
 conn = None
@@ -13,6 +14,9 @@ attempt = 0
 locked = 0
 
 def log_action(username, action_type, description):
+    """
+    Log user actions to the logs table for auditing.
+    """
     try:
         con = mysql.connector.connect(
             host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
@@ -34,8 +38,10 @@ def log_action(username, action_type, description):
     except Exception as log_err:
         print(f"Failed to log action: {log_err}")
 
-
 def login(username, password):
+    """
+    Authenticate user credentials and set session variables.
+    """
     global conn, cursor, user_name, location, attempt, locked
     try:
         con = mysql.connector.connect(
@@ -48,11 +54,13 @@ def login(username, password):
         )
         curso = con.cursor(dictionary=True)
 
+        # Fetch user record
         curso.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = curso.fetchone()
     except Exception as err:
         print(f"Connection Error!\n{err}\n")
     if user:
+        # Hash password with pepper and compare
         password += user["pepper"]
         hash_obj = hashlib.sha256(password.encode('utf-8'))
         password = hash_obj.hexdigest()
@@ -78,6 +86,9 @@ def login(username, password):
         return False
 
 def welcome_page():
+    """
+    Display welcome/login prompt and handle login attempts and lockout.
+    """
     global conn, cursor, attempt, locked
     print("="*20)
     print("Welcome to stock tracker!\nPlease Log in\n*NOTE: To register, please contact head quater to be provisioned*\n")
@@ -102,6 +113,7 @@ def welcome_page():
         password = g.getpass("Enter password: ")
         if login(username, password):
             print(f"Login successful! Welcome {user_name}!")
+            # Connect with mover privilege after login
             conn = mysql.connector.connect(
                 host='ec2-3-25-95-9.ap-southeast-2.compute.amazonaws.com',
                 user='inventory_mover',
@@ -116,6 +128,9 @@ def welcome_page():
             print("Login failed. Please try again.")
 
 def scan_item():
+    """
+    Scan an RFID tag and update its location and stock levels.
+    """
     global cursor, location
     while True:
         try:
@@ -164,6 +179,9 @@ def scan_item():
             print(f"Error: {err}")
 
 def check_stock_level():
+    """
+    Display current stock levels for all items and locations.
+    """
     global cursor
     try:
         cursor.execute("""
@@ -191,6 +209,9 @@ def check_stock_level():
         print(f"Error: {err}\n")
 
 def view_item_details():
+    """
+    Show details for a selected item, including supplier info.
+    """
     global conn,cursor
     try:
         cursor.execute("SELECT i.item_id, i.item_name, i.description, i.supplier_id, s.supplier_name, s.contact_info FROM items i INNER JOIN  suppliers s on i.supplier_id = s.supplier_id")
@@ -201,12 +222,13 @@ def view_item_details():
         print("No items found")
         return
     while True:
+        # List all items for selection
         for index, row in enumerate(lists, start=1):
             print(f"{index}. {row['item_name']}")
         try:
             option = input("Please select an item to view details (1-{}): \n".format(len(lists)))
             option = int(option)-1
-            if option < 0 or option > len(lists):
+            if option < 0 or option > len(lists)-1:
                 raise ValueError("Please enter a number in the item list")
         except Exception as err:
             print(f"Please supply a valid input\nError: {err}\n")
@@ -215,6 +237,7 @@ def view_item_details():
         print(f"Showing item {lists[option]['item_name']}")
         print("-"*20)
         selected = lists[option]
+        # Print item details
         for key, value in selected.items():
             print(f"{key}: {value}")
         print("="*20 + "\n" + "="*20)
@@ -237,7 +260,11 @@ def view_item_details():
                 print(f"Please supply a valid input\nError: {err}")
         if quit:
             break
+
 def locate():
+    """
+    Locate an item and display its location and address.
+    """
     global conn, cursor
     try:
         cursor.execute("SELECT i.item_id, i.item_name, l.location_name, l.address from items i INNER JOIN stock_levels s ON i.item_id=s.item_id INNER JOIN locations l on l.location_id = s.location_id;")
@@ -248,6 +275,7 @@ def locate():
         print("No stock data found.\n")
         return
     while True:
+        # List all items for selection
         for index, row in enumerate(lists, start=1):
             print(f"{index}. {row['item_name']}")
         try:
@@ -262,6 +290,7 @@ def locate():
         print(f"Showing item {lists[option]['item_name']}")
         print("-"*20)
         selected = lists[option]
+        # Print item location details
         for key, value in selected.items():
             print(f"{key}: {value}")
         print("="*20 + "\n" + "="*20)
@@ -286,6 +315,9 @@ def locate():
             break
         
 def export():
+    """
+    Export inventory data to an Excel file.
+    """
     global conn
     try:
         query = """SELECT i.item_id, i.item_name, i.description, l.location_name, sl.quantity, s.supplier_name, s.contact_info 
@@ -303,6 +335,9 @@ def export():
         log_action(user_name, "ERROR", f"Export failed: {err}")
     
 def main_menu():
+    """
+    Main menu for user actions after login.
+    """
     global user_name
     print(f"Welcome! {user_name}")
     print("How can I help you today?\n")
@@ -337,6 +372,8 @@ def main_menu():
                     log_action(user_name, "Logged out", f"User {user_name} logged out")
                     sys.exit()
             print("Could I offer you any more help?\n")
+
 if __name__ == "__main__":
+    # Entry point: show welcome/login and then main menu
     welcome_page()
     main_menu()
