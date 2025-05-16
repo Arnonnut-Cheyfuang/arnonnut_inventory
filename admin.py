@@ -545,7 +545,7 @@ def main_menu():
             print("="*20)
             try:
                 option = int(option)
-                if option not in range(1,7):
+                if option not in range(1,10):
                     raise ValueError("Selected value is not in the option\n")
             except Exception as err:
                 print(f"Please input a valid choice!\nError: {err}\n")
